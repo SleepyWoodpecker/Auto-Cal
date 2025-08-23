@@ -6,6 +6,14 @@ Input {
   margin: 0 1;
 }
 
+DataTable {
+  margin: 1 1;
+}
+
+DataTable > .column-header {
+  width: 40;
+}
+
 #main-app-container {
   layout: grid;
   grid-size: 2 1; 
