@@ -1,12 +1,14 @@
 from textual import on
 from textual.app import App, ComposeResult
-from textual.widgets import Footer, Header, Input, Label
-from textual.containers import HorizontalGroup, VerticalGroup, Container
+from textual.widgets import Footer, Header, Input, Label, ProgressBar
+from textual.containers import HorizontalGroup, VerticalGroup, Container, Middle
 from textual.validation import Number
 from textual.reactive import reactive
 from textual.css.query import NoMatches
 from textual.message import Message
 from textual.widget import Widget
+from textual.timer import Timer
+import time
 
 
 class AutoCalCli(App):
@@ -72,21 +74,48 @@ class CurrentCalibrationDisplay(VerticalGroup):
 
 class CurrentCalibrationProgressIndicator(Widget):
     current_pressure: reactive[float] = reactive(-1)
+    raw_reading: reactive[float] = reactive(-1)
+    progress_timer: Timer
+    is_first_load = True
 
     def compose(self) -> ComposeResult:
         with Container(id="current-calibration-progress-indicator"):
             yield Label(
                 f"Reading pressure... {self.current_pressure}", id="pressure-display"
             )
+            yield Label("", id="raw-reading")
+            yield ProgressBar(total=11)
 
-    def watch_current_pressure(self, pressure: int) -> None:
+    def watch_current_pressure(self, pressure: float) -> None:
         """Update the label when pressure changes"""
-        print("HEYYYY")
         try:
             label = self.query_one("#pressure-display", Label)
-            label.update(f"Reading pressure... {pressure}")
+            label.update(f"Reading pressure... {pressure if pressure >= 0 else ''}")
+
+            # NOTE: After the new pressure is indicated, wait a fixed amount of time for the raw reading to stabilize. Currently, it is a hard coded value of 3 seconds
+            if not self.is_first_load:
+                self.set_timer(3, lambda: self.query_one(ProgressBar).advance(1))
+            else:
+                self.is_first_load = False
+
         except NoMatches:
             pass
+
+    def watch_raw_reading(self, new_reading: float) -> None:
+        """Update the screen when a raw reading comes in from serial"""
+        try:
+            label = self.query_one("#raw-reading", Label)
+            label.update(f"{f'Raw reading: {new_reading}' if new_reading >= 0 else ''}")
+            self.query_one(ProgressBar).advance(1)
+
+        except NoMatches:
+            pass
+
+    def on_mount(self) -> None:
+        """Set up timer"""
+
+        # NOTE: 11 is an arbitrary value, 1 for setup, another 10 assuming that the average of 10 readings is needed. Need to ensure that this eventually becomes a dynamic value
+        self.progress_timer = self.set_interval(0 / 11, None, pause=True)
 
 
 class CurrentCalibrationUserInputWidget(VerticalGroup):
