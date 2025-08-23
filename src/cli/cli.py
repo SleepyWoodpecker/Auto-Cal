@@ -1,48 +1,28 @@
-import os
-from PyInquirer import prompt
-from typing import TypedDict
+from textual.app import App, ComposeResult
+from textual.widgets import Footer, Header
 
 
-class UserInput(TypedDict):
-    num_pts: int
-    calibration_output_folder: str
+class AutoCalCli(App):
+    """A textual app to get user input for linear regression calculations"""
+
+    BINDINGS = [
+        ("q", "quit", "Quit"),
+        ("d", "toggle_dark", "Toggle dark mode"),
+    ]
+
+    def compose(self) -> ComposeResult:
+        """Create header and footer"""
+        yield Header()
+        yield Footer()
+
+    # custom functions which are to be called should be in the form: action_func_name
+    def action_toggle_dark(self) -> None:
+        """Toggle appearance of cli"""
+        self.theme = (
+            "textual-dark" if self.theme == "textual-light" else "textual-light"
+        )
 
 
-def get_user_input() -> UserInput:
-    """
-    get user arguments required for auto-cal to run:
-        1. number of pts
-        2. output file for calibrations
-    """
-
-    questions = []
-
-    questions.append(
-        {
-            "type": "input",
-            "name": "num_pts",
-            "message": "Number of pts you wish to calibrate:",
-            "validate": lambda val: val.isdigit() or "Please enter a valid integer",
-        }
-    )
-
-    def validate_folder(val: str) -> bool | str:
-        try:
-            os.makedirs(val, exist_ok=True)
-            return True
-        except Exception:
-            return "Failed to create output file, please enter another file name"
-
-    questions.append(
-        {
-            "type": "input",
-            "name": "calibration_output_folder",
-            "message": "Output folder for calibrations: ",
-            "default": "pt_calibrations",
-            "validate": validate_folder,
-        }
-    )
-
-    answers = prompt(questions=questions)
-
-    return answers
+if __name__ == "__main__":
+    app = AutoCalCli()
+    app.run()
