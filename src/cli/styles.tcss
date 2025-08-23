@@ -16,7 +16,6 @@ Input {
   border: solid red;
   layout: grid;
   grid-size: 1 2;
-  grid-rows: 3fr 1fr;
 }
 
 #current-calibration-progress-indicator {
