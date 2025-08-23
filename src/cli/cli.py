@@ -21,8 +21,3 @@ class AutoCalCli(App):
         self.theme = (
             "textual-dark" if self.theme == "textual-light" else "textual-light"
         )
-
-
-if __name__ == "__main__":
-    app = AutoCalCli()
-    app.run()
