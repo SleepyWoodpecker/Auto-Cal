@@ -1,0 +1,33 @@
+Label {
+  margin: 1 2;
+}
+
+Input {
+  margin: 1 1;
+}
+
+#main-app-container {
+  layout: grid;
+  grid-size: 2 1; 
+  grid-columns: 3fr 1fr;
+}
+
+#current-calibration-container {
+  border: solid red;
+  layout: grid;
+  grid-size: 1 2;
+}
+
+#current-calibration-progress-indicator {
+  border: solid blue;
+}
+
+#current-calibration-input-container {
+  border: solid green;
+}
+
+#previous-display {
+  border: solid orange;
+}
+
+
