@@ -10,8 +10,15 @@ DataTable {
   margin: 1 1;
 }
 
-DataTable > .column-header {
-  width: 40;
+ProgressBar {
+  align: center middle;
+  height: 5;
+}
+
+Middle {
+  border: solid purple;
+  width: 100%;
+  align: center middle;
 }
 
 #main-app-container {

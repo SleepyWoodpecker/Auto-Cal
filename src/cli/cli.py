@@ -1,7 +1,7 @@
 from textual import on
 from textual.app import App, ComposeResult
 from textual.widgets import Footer, Header, Input, Label, ProgressBar, DataTable, Button
-from textual.containers import HorizontalGroup, VerticalGroup, Container
+from textual.containers import HorizontalGroup, VerticalGroup, Container, Middle
 from textual.validation import Number
 from textual.reactive import reactive
 from textual.css.query import NoMatches
@@ -107,7 +107,8 @@ class CurrentCalibrationProgressIndicator(Widget):
                 f"Reading pressure... {self.current_pressure}", id="pressure-display"
             )
             yield Label("", id="raw-reading")
-            yield ProgressBar(total=11)
+            with Middle():
+                yield ProgressBar(total=11, show_eta=False, show_percentage=False)
             yield Button(label="New")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
@@ -213,4 +214,7 @@ class PreviousCalculationDisplay(VerticalGroup):
 
     def on_table_row_updated(self, message: TableRowUpdated) -> None:
         table = self.query_one(DataTable)
-        table.add_row(message.pressure, message.raw_reading)
+
+        # only add rows to the table if the values are valid
+        if message.pressure >= 0 and message.pressure >= 0:
+            table.add_row(message.pressure, message.raw_reading)
