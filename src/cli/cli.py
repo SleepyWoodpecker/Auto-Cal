@@ -209,7 +209,7 @@ class PreviousCalculationDisplay(VerticalGroup):
 
     def on_mount(self) -> None:
         table = self.query_one(DataTable)
-        table.add_columns("Pressure", "Avg Raw Voltage")
+        table.add_columns("Pressure", "Avg Voltage")
 
     def on_table_row_updated(self, message: TableRowUpdated) -> None:
         table = self.query_one(DataTable)
