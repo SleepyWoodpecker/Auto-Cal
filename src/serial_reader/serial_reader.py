@@ -4,11 +4,17 @@ import numpy as np
 
 class SerialReader:
     def __init__(
-        self, serial_port: str, baud_rate: int, num_sensors: int, timeout: int = 2
+        self,
+        serial_port: str,
+        baud_rate: int,
+        num_sensors: int,
+        num_readings_per_pt: int,
+        timeout: int = 2,
     ):
         self.serial = Serial(serial_port, baudrate=baud_rate, timeout=timeout)
         self.readings = {i: [] for i in range(num_sensors)}
         self.num_sensors = num_sensors
+        self.num_readings_per_pt = num_readings_per_pt
 
     def read_from_serial(self) -> None:
         """take a reading from serial, and place it into the readings dict"""
@@ -35,11 +41,22 @@ class SerialReader:
         for pt_no, reading in enumerate(readings):
             self.readings[pt_no].append(reading)
 
-    def calculate_avg(self) -> dict[int, float]:
+    def calculate_avg(self) -> list[float]:
         """calculate the average reading for the current set of values and clear the reading history"""
-        avg_dict = {}
+        avg_readings = []
         for pt_no, readings in self.readings.items():
-            avg_dict[pt_no] = np.mean(np.array(readings))
+            avg_readings.append(np.mean(np.array(readings)).item())
             self.readings[pt_no] = []
 
-        return avg_dict
+        return avg_readings
+
+    def ready_for_avg(self) -> bool:
+        """crudely check for"""
+        if len(self.readings) <= 0:
+            return False
+
+        for reding_set in self.readings.values():
+            if len(reding_set) != self.num_readings_per_pt:
+                return False
+
+        return True
