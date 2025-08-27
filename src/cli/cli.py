@@ -1,7 +1,13 @@
 from textual import on
 from textual.app import App, ComposeResult
 from textual.widgets import Footer, Header, Input, Label, ProgressBar, DataTable, Button
-from textual.containers import HorizontalGroup, VerticalGroup, Container, Middle
+from textual.containers import (
+    HorizontalGroup,
+    VerticalGroup,
+    Container,
+    Center,
+    Middle,
+)
 from textual.validation import Number
 from textual.reactive import reactive
 from textual.css.query import NoMatches

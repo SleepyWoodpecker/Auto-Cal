@@ -26,7 +26,6 @@ Middle {
 }
 
 #current-calibration-container {
-  border: solid red;
   layout: grid;
   grid-size: 2 1;
 }
@@ -44,4 +43,6 @@ Middle {
   border: solid orange;
 }
 
-
+#current-pressure-label {
+  dock: top;
+}
