@@ -120,10 +120,11 @@ class CurrentCalibrationProgressIndicator(Widget):
     def __init__(self, num_readings_per_pressure: int, serial_port: str):
         # initialize a serial reader class
         self.serial_reader = serial_reader.SerialReader(
-            serial_port, 115_200, 3, self.num_readings_per_pressure
+            serial_port, 115_200, 3, num_readings_per_pressure
         )
 
         self.num_readings_per_pressure = num_readings_per_pressure
+        super().__init__()
 
     def compose(self) -> ComposeResult:
         with Container(id="current-calibration-progress-indicator"):
