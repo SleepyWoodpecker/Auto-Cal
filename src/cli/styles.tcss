@@ -46,3 +46,7 @@ Middle {
 #current-pressure-label {
   dock: top;
 }
+
+#error-message {
+  color: $error;
+}
