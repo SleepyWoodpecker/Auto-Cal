@@ -76,22 +76,14 @@ class CurrentCalibrationDisplay(VerticalGroup):
 
     def compose(self) -> ComposeResult:
         with Container(id="current-calibration-container"):
+            yield CurrentCalibrationUserInputWidget().data_bind()
             yield CurrentCalibrationProgressIndicator().data_bind(
                 CurrentCalibrationDisplay.current_pressure
             )
-            yield CurrentCalibrationUserInputWidget().data_bind()
 
     def on_pressure_updated(self, message: PressureUpdated) -> None:
         """Handle pressure updates from child widgets"""
         self.current_pressure = message.pressure
-
-    # def on_average_raw_reading_updated(
-    #     self, avg_raw_readings: AverageRawReadingUpdated
-    # ) -> None:
-    #     """Forward the avg_raw_readings message to the parent"""
-    #     print(f"CurrentCalibrationDisplay received message: {avg_raw_readings}")
-    #     self.post_message(avg_raw_readings)
-    #     print("CurrentCalibrationDisplay forwarded message")
 
 
 class CurrentCalibrationProgressIndicator(Widget):

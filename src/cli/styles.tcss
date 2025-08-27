@@ -16,21 +16,19 @@ ProgressBar {
 }
 
 Middle {
-  border: solid purple;
   width: 100%;
   align: center middle;
 }
 
 #main-app-container {
   layout: grid;
-  grid-size: 2 1; 
-  grid-columns: 3fr 1fr;
+  grid-size: 1 2; 
 }
 
 #current-calibration-container {
   border: solid red;
   layout: grid;
-  grid-size: 1 2;
+  grid-size: 2 1;
 }
 
 #current-calibration-progress-indicator {
@@ -39,6 +37,7 @@ Middle {
 
 #current-calibration-input-container {
   border: solid green;
+  align: center middle;
 }
 
 #previous-display {
