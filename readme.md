@@ -51,4 +51,5 @@ https://github.com/user-attachments/assets/e053b715-f8eb-429d-b119-fccfdb684d5d
   <li>
   Disable input box: while taking readings & after the calibrations are complete </li>
   <li>Improve error messaging </li>
+  <li>Write output calibrations to a file</li>
 </ul>
