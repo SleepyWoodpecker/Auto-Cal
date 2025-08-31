@@ -1,6 +1,6 @@
 from textual import on
 from textual.app import App, ComposeResult
-from textual.widgets import Footer, Header, Input, Label, ProgressBar, DataTable, Button
+from textual.widgets import Footer, Header, Input, Label, ProgressBar, DataTable
 from textual.containers import (
     HorizontalGroup,
     VerticalGroup,
@@ -22,6 +22,11 @@ class CalculateLinearRegressionAction(Message):
         super().__init__()
 
 
+class TriggerCalibrationMessageAction(Message):
+    def __init__(self):
+        super().__init__()
+
+
 class AutoCalCli(App):
     """A textual app to get user input for linear regression calculations"""
 
@@ -29,7 +34,7 @@ class AutoCalCli(App):
 
     BINDINGS = [
         ("ctrl+q", "quit", "Quit"),
-        ("ctrl+a", "calibrate", "Calibrate PTs"),
+        ("ctrl+g", "calibrate", "Calibrate PTs"),
     ]
 
     def __init__(self, num_readings_per_pressure: int, serial_port: str, num_pts: int):
@@ -50,11 +55,19 @@ class AutoCalCli(App):
             self.num_readings_per_pressure, self.num_pts, self.serial_reader
         )
 
-    def action_calibrate(self) -> None:
-        """Tell the system to calculate the linear regression"""
+    def _post_calibration_message(self) -> None:
         self.query_one(PreviousCalculationDisplay).post_message(
             CalculateLinearRegressionAction()
         )
+
+    def action_calibrate(self) -> None:
+        """Tell the system to calculate the linear regression"""
+        self._post_calibration_message()
+
+    def on_trigger_calibration_message_action(
+        self, message: TriggerCalibrationMessageAction
+    ) -> None:
+        self._post_calibration_message()
 
 
 class AverageRawReadingUpdated(Message):
@@ -222,7 +235,10 @@ class CurrentCalibrationProgressIndicator(Widget):
 class CurrentCalibrationUserInputWidget(VerticalGroup):
     """The widget which accepts user input"""
 
-    BINDINGS = [("escape", "blur", "unfocus input")]
+    BINDINGS = [
+        ("escape", "blur", "unfocus input"),
+        ("ctrl+g", "calibrate_message", "calibrate PTs"),
+    ]
 
     def compose(self) -> ComposeResult:
         with Container(id="current-calibration-input-container"):
@@ -262,6 +278,9 @@ class CurrentCalibrationUserInputWidget(VerticalGroup):
         self.set_error_label("")
         input_widget = self.query_one("#current-pressure-input", Input)
         input_widget.remove_class("-invalid")
+
+    def action_calibrate_message(self) -> None:
+        self.post_message(TriggerCalibrationMessageAction())
 
 
 class PreviousCalculationDisplay(VerticalGroup):
