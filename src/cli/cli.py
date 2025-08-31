@@ -159,7 +159,7 @@ class CurrentCalibrationProgressIndicator(Widget):
 
     # async method to handle the reading of data from serial
     async def take_readings_from_serial(self) -> None:
-        # serial.read
+        print("This worker is running!")
         for _ in range(self.num_readings_per_pressure):
             self.serial_reader.read_from_serial()
 

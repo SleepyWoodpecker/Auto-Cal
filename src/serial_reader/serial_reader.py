@@ -42,7 +42,7 @@ class SerialReader:
 
         # add the reading to the dict
         for pt_no, reading in enumerate(readings):
-            self.readings[pt_no].append(reading)
+            self.readings[pt_no].append(np.float64(reading))
 
     def calculate_avg(self) -> list[float]:
         """calculate the average reading for the current set of values and clear the reading history"""
@@ -63,3 +63,19 @@ class SerialReader:
                 return False
 
         return True
+
+
+if __name__ == "__main__":
+    serial = SerialReader(
+        serial_port="/dev/tty.usbserial-0001",
+        baud_rate=115200,
+        num_sensors=3,
+        num_readings_per_pt=10,
+    )
+
+    for _ in range(10):
+        serial.read_from_serial()
+
+    if serial.ready_for_avg():
+        print("We are ready!")
+        print(serial.calculate_avg())
