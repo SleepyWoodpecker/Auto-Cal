@@ -1,7 +1,7 @@
 **Automated Calibration for PTs and LCs**
 
 <hr />
-![Auto Cal Demo](./assets/demo.gif "Demo")
+![Auto Cal Demo](./assets/demo.gif)
 
 <hr />
 
