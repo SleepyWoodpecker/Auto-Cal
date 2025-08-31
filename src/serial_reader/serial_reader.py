@@ -18,6 +18,9 @@ class SerialReader:
 
     def read_from_serial(self) -> None:
         """take a reading from serial, and place it into the readings dict"""
+        # clear the current readings first
+        self.serial.reset_input_buffer()
+
         line = None
         try:
             line = self.serial.readline().decode().strip()
