@@ -34,4 +34,4 @@ def calculate_linear_regression(
 
     slope, intercept = np.polyfit(x_array, y_array, 1)
 
-    return float(slope), float(intercept)
+    return float(np.round(slope, decimals=5)), float(np.round(intercept, decimals=5))

@@ -1,6 +1,7 @@
 from serial import Serial
 import numpy as np
 import threading
+from cal import cal
 
 
 class SerialReader:
@@ -17,6 +18,7 @@ class SerialReader:
         self.num_sensors = num_sensors
         self.num_readings_per_pt = num_readings_per_pt
         self.serial_lock = threading.Lock()
+        self.all_avgs = {i: [] for i in range(num_sensors)}
 
     def read_from_serial(self) -> None:
         """take a reading from serial, and place it into the readings dict"""
@@ -47,11 +49,14 @@ class SerialReader:
         for pt_no, reading in enumerate(readings):
             self.readings[pt_no].append(np.float64(reading))
 
-    def calculate_avg(self) -> list[float]:
+    def calculate_avg(self, current_pressure: float) -> list[float]:
         """calculate the average reading for the current set of values and clear the reading history"""
         avg_readings = []
         for pt_no, readings in self.readings.items():
-            avg_readings.append(np.mean(np.array(readings)).item())
+            avg_for_pt = np.mean(np.array(readings)).item()
+            avg_readings.append(avg_for_pt)
+            self.all_avgs[pt_no].append((current_pressure, avg_for_pt))
+
             self.readings[pt_no] = []
 
         return avg_readings
@@ -67,6 +72,22 @@ class SerialReader:
 
         return True
 
+    def get_all_linear_regressions(self) -> dict[int, tuple[float, float]]:
+        """returns data in format pt: (m, c)"""
+        linear_regressions = {}
+        for pt, pressure_value_pair in self.all_avgs.items():
+            pressures = []
+            avg_readings = []
+            for pressure, avg_reading in pressure_value_pair:
+                pressures.append(pressure)
+                avg_readings.append(avg_reading)
+
+            linear_regressions[pt] = cal.calculate_linear_regression(
+                pressures, avg_readings
+            )
+
+        return linear_regressions
+
 
 if __name__ == "__main__":
     serial = SerialReader(
@@ -81,4 +102,4 @@ if __name__ == "__main__":
 
     if serial.ready_for_avg():
         print("We are ready!")
-        print(serial.calculate_avg())
+        print(serial.calculate_avg(123))

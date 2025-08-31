@@ -17,6 +17,11 @@ from textual.timer import Timer
 from serial_reader import serial_reader
 
 
+class CalculateLinearRegressionAction(Message):
+    def __init__(self):
+        super().__init__()
+
+
 class AutoCalCli(App):
     """A textual app to get user input for linear regression calculations"""
 
@@ -24,13 +29,17 @@ class AutoCalCli(App):
 
     BINDINGS = [
         ("ctrl+q", "quit", "Quit"),
-        ("ctrl+d", "toggle_dark", "Toggle dark mode"),
+        ("ctrl+a", "calibrate", "Calibrate PTs"),
     ]
 
     def __init__(self, num_readings_per_pressure: int, serial_port: str, num_pts: int):
         self.num_readings_per_pressure = num_readings_per_pressure
-        self.serial_port = serial_port
         self.num_pts = num_pts
+
+        # initialize a serial reader class
+        self.serial_reader = serial_reader.SerialReader(
+            serial_port, 115_200, 3, num_readings_per_pressure
+        )
         super().__init__()
 
     def compose(self) -> ComposeResult:
@@ -38,14 +47,13 @@ class AutoCalCli(App):
         yield Header()
         yield Footer()
         yield FullCalibrationDisplay(
-            self.num_readings_per_pressure, self.serial_port, self.num_pts
+            self.num_readings_per_pressure, self.num_pts, self.serial_reader
         )
 
-    # custom functions which are to be called should be in the form: action_func_name
-    def action_toggle_dark(self) -> None:
-        """Toggle appearance of cli"""
-        self.theme = (
-            "textual-dark" if self.theme == "textual-light" else "textual-light"
+    def action_calibrate(self) -> None:
+        """Tell the system to calculate the linear regression"""
+        self.query_one(PreviousCalculationDisplay).post_message(
+            CalculateLinearRegressionAction()
         )
 
 
@@ -66,19 +74,24 @@ class TableRowUpdated(Message):
 class FullCalibrationDisplay(HorizontalGroup):
     """The main container for displaying the current readings and the previously calculated readings"""
 
-    def __init__(self, num_readings_per_pressure: int, serial_port: str, num_pts: int):
+    def __init__(
+        self,
+        num_readings_per_pressure: int,
+        num_pts: int,
+        serial_reader: serial_reader.SerialReader,
+    ):
         self.num_readings_per_pressure = num_readings_per_pressure
-        self.serial_port = serial_port
         self.num_pts = num_pts
+        self.serial_reader = serial_reader
         super().__init__()
 
     # current set of readings + current set of commands
     def compose(self) -> ComposeResult:
         with Container(id="main-app-container"):
             yield CurrentCalibrationDisplay(
-                self.num_readings_per_pressure, self.serial_port
+                self.num_readings_per_pressure, self.serial_reader
             )
-            yield PreviousCalculationDisplay(self.num_pts)
+            yield PreviousCalculationDisplay(self.num_pts, self.serial_reader)
 
     def on_average_raw_reading_updated(self, message: AverageRawReadingUpdated) -> None:
         self.query_one(PreviousCalculationDisplay).post_message(
@@ -97,16 +110,18 @@ class CurrentCalibrationDisplay(VerticalGroup):
 
     current_pressure: reactive[float] = reactive(-1)
 
-    def __init__(self, num_readings_per_pressure: int, serial_port: str):
+    def __init__(
+        self, num_readings_per_pressure: int, serial_reader: serial_reader.SerialReader
+    ):
         self.num_readings_per_pressure = num_readings_per_pressure
-        self.serial_port = serial_port
+        self.serial_reader = serial_reader
         super().__init__()
 
     def compose(self) -> ComposeResult:
         with Container(id="current-calibration-container"):
             yield CurrentCalibrationUserInputWidget().data_bind()
             yield CurrentCalibrationProgressIndicator(
-                self.num_readings_per_pressure, self.serial_port
+                self.num_readings_per_pressure, self.serial_reader
             ).data_bind(CurrentCalibrationDisplay.current_pressure)
 
     def on_pressure_updated(self, message: PressureUpdated) -> None:
@@ -127,13 +142,11 @@ class CurrentCalibrationProgressIndicator(Widget):
     progress_timer: Timer
     is_first_load = True
 
-    def __init__(self, num_readings_per_pressure: int, serial_port: str):
-        # initialize a serial reader class
-        self.serial_reader = serial_reader.SerialReader(
-            serial_port, 115_200, 3, num_readings_per_pressure
-        )
-
+    def __init__(
+        self, num_readings_per_pressure: int, serial_reader: serial_reader.SerialReader
+    ):
         self.num_readings_per_pressure = num_readings_per_pressure
+        self.serial_reader = serial_reader
         super().__init__()
 
     def compose(self) -> ComposeResult:
@@ -184,7 +197,8 @@ class CurrentCalibrationProgressIndicator(Widget):
         if self.serial_reader.ready_for_avg():
             self.post_message(
                 AverageRawReadingUpdated(
-                    self.current_pressure, self.serial_reader.calculate_avg()
+                    self.current_pressure,
+                    self.serial_reader.calculate_avg(self.current_pressure),
                 )
             )
 
@@ -251,8 +265,9 @@ class CurrentCalibrationUserInputWidget(VerticalGroup):
 
 
 class PreviousCalculationDisplay(VerticalGroup):
-    def __init__(self, num_pts: int) -> None:
+    def __init__(self, num_pts: int, serial_reader: serial_reader.SerialReader) -> None:
         self.num_pts = num_pts
+        self.serial_reader = serial_reader
         super().__init__()
 
     def compose(self) -> ComposeResult:
@@ -265,7 +280,9 @@ class PreviousCalculationDisplay(VerticalGroup):
 
         # create an additional column for each PT there is
         pt_columns = [f"PT {i + 1}" for i in range(self.num_pts)]
-        table.add_columns("Pressure", *pt_columns)
+        table.add_column("Pressure", key="Pressure")
+        for pt in pt_columns:
+            table.add_column(pt, key=pt)
 
     def on_table_row_updated(self, message: TableRowUpdated) -> None:
         table = self.query_one(DataTable)
@@ -273,3 +290,33 @@ class PreviousCalculationDisplay(VerticalGroup):
         # only add rows to the table if the values are valid
         if message.pressure >= 0 and message.pressure >= 0:
             table.add_row(message.pressure, *message.raw_readings)
+
+    def on_calculate_linear_regression_action(
+        self, message: CalculateLinearRegressionAction
+    ) -> None:
+        try:
+            table = self.query_one(DataTable)
+            self.query_one(Label).update("Calibration factors")
+        except NoMatches:
+            return
+
+        table.clear()
+
+        # remove the old columns
+        table.remove_column("Pressure")
+        pt_columns = [f"PT {i + 1}" for i in range(self.num_pts)]
+        for pt in pt_columns:
+            table.remove_column(pt)
+
+        # add a calibration column to the start
+        table.add_column("Calibration Values", key="values")
+        table.add_columns(*pt_columns)
+
+        lrs = self.serial_reader.get_all_linear_regressions()
+
+        # add the m values
+        slopes = [val[0] for val in lrs.values()]
+        table.add_row("m", *slopes)
+
+        intercepts = [val[1] for val in lrs.values()]
+        table.add_row("c", *intercepts)
