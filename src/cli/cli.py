@@ -49,7 +49,7 @@ class AutoCalCli(App):
 
         # initialize a serial reader class
         self.serial_reader = serial_reader.SerialReader(
-            serial_port, baud_rate, 3, num_readings_per_pressure
+            serial_port, baud_rate, num_pts, num_readings_per_pressure
         )
         super().__init__()
 

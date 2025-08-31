@@ -40,10 +40,9 @@ class SerialReader:
         # pt1, pt2, pt3...
         readings = line.split(", ")
         if len(readings) != self.num_sensors:
-            print(
-                f"Expected {self.num_sensors} readings, but received {len(readings)} readings"
+            raise ValueError(
+                f"Expected {self.num_sensors} readings, but received {len(readings)} | readings: {readings}"
             )
-            raise ValueError("Incorrect number of pts and sensor readings obtained")
 
         # add the reading to the dict
         for pt_no, reading in enumerate(readings):
@@ -87,19 +86,3 @@ class SerialReader:
             )
 
         return linear_regressions
-
-
-if __name__ == "__main__":
-    serial = SerialReader(
-        serial_port="/dev/tty.usbserial-0001",
-        baud_rate=115200,
-        num_sensors=3,
-        num_readings_per_pt=10,
-    )
-
-    for _ in range(10):
-        serial.read_from_serial()
-
-    if serial.ready_for_avg():
-        print("We are ready!")
-        print(serial.calculate_avg(123))
