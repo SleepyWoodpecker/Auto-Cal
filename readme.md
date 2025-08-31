@@ -1,7 +1,8 @@
 **Automated Calibration for PTs and LCs**
 
 <hr />
-![Image](https://github.com/user-attachments/assets/64fe90f2-93b8-492f-8d30-7d4e2bd9d534)
+
+https://github.com/user-attachments/assets/e053b715-f8eb-429d-b119-fccfdb684d5d
 
 <hr />
 
