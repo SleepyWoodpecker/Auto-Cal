@@ -181,11 +181,12 @@ class CurrentCalibrationProgressIndicator(Widget):
                 pass
 
         # after completing the readings, calculate the average values
-        self.post_message(
-            AverageRawReadingUpdated(
-                self.current_pressure, self.serial_reader.calculate_avg()
+        if self.serial_reader.ready_for_avg():
+            self.post_message(
+                AverageRawReadingUpdated(
+                    self.current_pressure, self.serial_reader.calculate_avg()
+                )
             )
-        )
 
         return
 
@@ -196,18 +197,12 @@ class CurrentCalibrationProgressIndicator(Widget):
             label = self.query_one("#raw-reading", Label)
             label.update(f"{f'Raw reading: {new_reading}' if new_reading >= 0 else ''}")
 
-            print("Message posted!")
-
-            self.query_one(ProgressBar).advance(1)
-
         except NoMatches:
             pass
 
     def on_mount(self) -> None:
         """Set up timer"""
-
-        # NOTE: 11 is an arbitrary value, 1 for setup, another 10 assuming that the average of 10 readings is needed. Need to ensure that this eventually becomes a dynamic value
-        self.progress_timer = self.set_interval(0 / 11, None, pause=True)
+        self.query_one(ProgressBar).update(progress=0)
 
 
 class CurrentCalibrationUserInputWidget(VerticalGroup):
