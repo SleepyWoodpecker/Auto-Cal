@@ -27,16 +27,19 @@ class AutoCalCli(App):
         ("ctrl+d", "toggle_dark", "Toggle dark mode"),
     ]
 
-    def __init__(self, num_readings_per_pressure: int, serial_port: str):
+    def __init__(self, num_readings_per_pressure: int, serial_port: str, num_pts: int):
         self.num_readings_per_pressure = num_readings_per_pressure
         self.serial_port = serial_port
+        self.num_pts = num_pts
         super().__init__()
 
     def compose(self) -> ComposeResult:
         """Create header and footer"""
         yield Header()
         yield Footer()
-        yield FullCalibrationDisplay(self.num_readings_per_pressure, self.serial_port)
+        yield FullCalibrationDisplay(
+            self.num_readings_per_pressure, self.serial_port, self.num_pts
+        )
 
     # custom functions which are to be called should be in the form: action_func_name
     def action_toggle_dark(self) -> None:
@@ -63,9 +66,10 @@ class TableRowUpdated(Message):
 class FullCalibrationDisplay(HorizontalGroup):
     """The main container for displaying the current readings and the previously calculated readings"""
 
-    def __init__(self, num_readings_per_pressure: int, serial_port: str):
+    def __init__(self, num_readings_per_pressure: int, serial_port: str, num_pts: int):
         self.num_readings_per_pressure = num_readings_per_pressure
         self.serial_port = serial_port
+        self.num_pts = num_pts
         super().__init__()
 
     # current set of readings + current set of commands
@@ -74,7 +78,7 @@ class FullCalibrationDisplay(HorizontalGroup):
             yield CurrentCalibrationDisplay(
                 self.num_readings_per_pressure, self.serial_port
             )
-            yield PreviousCalculationDisplay()
+            yield PreviousCalculationDisplay(self.num_pts)
 
     def on_average_raw_reading_updated(self, message: AverageRawReadingUpdated) -> None:
         self.query_one(PreviousCalculationDisplay).post_message(
@@ -109,6 +113,12 @@ class CurrentCalibrationDisplay(VerticalGroup):
         """Handle pressure updates from child widgets"""
         self.current_pressure = message.pressure
 
+        # reset the progress bar as well
+        try:
+            self.query_one(ProgressBar).update(progress=0)
+        except NoMatches:
+            pass
+
 
 class CurrentCalibrationProgressIndicator(Widget):
     current_pressure: reactive[float] = reactive(-1)
@@ -134,7 +144,7 @@ class CurrentCalibrationProgressIndicator(Widget):
             yield Label("", id="raw-reading")
             with Middle():
                 yield ProgressBar(
-                    total=self.num_readings_per_pressure + 1,
+                    total=self.num_readings_per_pressure,
                     show_eta=False,
                     show_percentage=False,
                 )
@@ -146,10 +156,12 @@ class CurrentCalibrationProgressIndicator(Widget):
             label.update(f"Reading pressure... {pressure if pressure >= 0 else ''}")
             self.current_pressure = pressure
 
-            # NOTE: After the new pressure is indicated, wait a fixed amount of time for the raw reading to stabilize. Currently, it is a hard coded value of 3 seconds
             if not self.is_first_load:
                 self.run_worker(
-                    self.take_readings_from_serial, exclusive=True, exit_on_error=True
+                    self.take_readings_from_serial,
+                    exclusive=True,
+                    exit_on_error=True,
+                    thread=True,
                 )
             else:
                 self.is_first_load = False
@@ -159,7 +171,6 @@ class CurrentCalibrationProgressIndicator(Widget):
 
     # async method to handle the reading of data from serial
     async def take_readings_from_serial(self) -> None:
-        print("This worker is running!")
         for _ in range(self.num_readings_per_pressure):
             self.serial_reader.read_from_serial()
 
@@ -170,12 +181,13 @@ class CurrentCalibrationProgressIndicator(Widget):
                 pass
 
         # after completing the readings, calculate the average values
-        if self.serial_reader.ready_for_avg():
-            self.post_message(
-                AverageRawReadingUpdated(
-                    self.current_pressure, self.serial_reader.calculate_avg()
-                )
+        self.post_message(
+            AverageRawReadingUpdated(
+                self.current_pressure, self.serial_reader.calculate_avg()
             )
+        )
+
+        return
 
     def watch_raw_reading(self, new_reading: float) -> None:
         """Update the screen when a raw reading comes in from serial"""
@@ -244,6 +256,10 @@ class CurrentCalibrationUserInputWidget(VerticalGroup):
 
 
 class PreviousCalculationDisplay(VerticalGroup):
+    def __init__(self, num_pts: int) -> None:
+        self.num_pts = num_pts
+        super().__init__()
+
     def compose(self) -> ComposeResult:
         with Container(id="previous-display"):
             yield Label("Previous readings")
@@ -251,7 +267,10 @@ class PreviousCalculationDisplay(VerticalGroup):
 
     def on_mount(self) -> None:
         table = self.query_one(DataTable)
-        table.add_columns("Pressure", "Avg Voltage")
+
+        # create an additional column for each PT there is
+        pt_columns = [f"PT {i + 1}" for i in range(self.num_pts)]
+        table.add_columns("Pressure", *pt_columns)
 
     def on_table_row_updated(self, message: TableRowUpdated) -> None:
         table = self.query_one(DataTable)
