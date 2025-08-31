@@ -19,6 +19,7 @@ def main() -> None:
         sys.exit(1)
 
     app = cli.AutoCalCli(
+        baud_rate=int(answers["baud_rate"]),
         serial_port="/dev/tty.usbserial-0001",
         num_readings_per_pressure=int(answers["num_readings_per_pt"]),
         num_pts=int(answers["num_pts"]),

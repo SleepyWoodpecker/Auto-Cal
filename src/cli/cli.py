@@ -37,13 +37,19 @@ class AutoCalCli(App):
         ("ctrl+g", "calibrate", "Calibrate PTs"),
     ]
 
-    def __init__(self, num_readings_per_pressure: int, serial_port: str, num_pts: int):
+    def __init__(
+        self,
+        baud_rate: int,
+        num_readings_per_pressure: int,
+        serial_port: str,
+        num_pts: int,
+    ):
         self.num_readings_per_pressure = num_readings_per_pressure
         self.num_pts = num_pts
 
         # initialize a serial reader class
         self.serial_reader = serial_reader.SerialReader(
-            serial_port, 115_200, 3, num_readings_per_pressure
+            serial_port, baud_rate, 3, num_readings_per_pressure
         )
         super().__init__()
 
