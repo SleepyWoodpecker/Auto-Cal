@@ -71,9 +71,9 @@ class AutoCalCli(App):
         )
 
     def _post_calibration_message(self) -> None:
-        self.query_one(PreviousCalculationDisplay).post_message(
-            CalculateLinearRegressionAction()
-        )
+        """Calculate the linear regression for all PTs"""
+        for calibration_display in self.query(PreviousCalculationDisplay):
+            calibration_display.post_message(CalculateLinearRegressionAction())
 
     def action_calibrate(self) -> None:
         """Tell the system to calculate the linear regression"""
@@ -86,16 +86,18 @@ class AutoCalCli(App):
 
 
 class AverageRawReadingUpdated(Message):
-    def __init__(self, pressure: float, raw_readings: list[float]) -> None:
+    def __init__(self, pressure: float, raw_readings: list[float], pt_id: str) -> None:
         self.pressure = pressure
         self.raw_readings = raw_readings
+        self.pt_id = pt_id
         super().__init__()
 
 
 class TableRowUpdated(Message):
-    def __init__(self, pressure: float, raw_readings: list[float]) -> None:
+    def __init__(self, pressure: float, raw_readings: list[float], pt_id: str) -> None:
         self.pressure = pressure
         self.raw_readings = raw_readings
+        self.pt_id = pt_id
         super().__init__()
 
 
@@ -127,9 +129,11 @@ class FullCalibrationDisplay(HorizontalGroup):
                     yield PreviousCalculationDisplay(reader, self.hv, self.lv)
 
     def on_average_raw_reading_updated(self, message: AverageRawReadingUpdated) -> None:
-        self.query_one(PreviousCalculationDisplay).post_message(
-            TableRowUpdated(message.pressure, message.raw_readings)
-        )
+        print("got the message here", message)
+        for prev_display in self.query(PreviousCalculationDisplay):
+            prev_display.post_message(
+                TableRowUpdated(message.pressure, message.raw_readings, message.pt_id)
+            )
 
 
 class PressureUpdated(Message):
@@ -244,7 +248,7 @@ class CurrentCalibrationProgressIndicator(Widget):
         for _ in range(self.num_readings_per_pressure):
             reader.read_from_serial()
             try:
-                self.query_one(f"{reader.get_pt_name()} progress", ProgressBar).advance(
+                self.query_one(f"#{reader.get_pt_id()}-progress", ProgressBar).advance(
                     1
                 )
             except NoMatches:
@@ -255,6 +259,7 @@ class CurrentCalibrationProgressIndicator(Widget):
                 AverageRawReadingUpdated(
                     self.current_pressure,
                     reader.calculate_avg(self.current_pressure),
+                    reader.get_pt_id(),
                 )
             )
 
@@ -335,7 +340,10 @@ class PreviousCalculationDisplay(VerticalGroup):
 
     def compose(self) -> ComposeResult:
         with Container(id=f"{self.reader.get_pt_id()}-previous-display"):
-            yield Label(f"Previous readings for {self.reader.get_pt_name()} PTs")
+            yield Label(
+                f"Previous readings for {self.reader.get_pt_name()} PTs",
+                id=f"{self.reader.get_pt_id()}-data-table-label",
+            )
             yield DataTable(id=f"{self.reader.get_pt_id()}-data-table")
 
     def on_mount(self) -> None:
@@ -348,7 +356,13 @@ class PreviousCalculationDisplay(VerticalGroup):
             table.add_column(pt, key=pt)
 
     def on_table_row_updated(self, message: TableRowUpdated) -> None:
-        table = self.query_one(DataTable)
+        # only handle the message if it is meant for this table
+        print("message received: ", message)
+
+        if message.pt_id != self.reader.get_pt_id():
+            return
+
+        table = self.query_one(f"#{self.reader.get_pt_id()}-data-table", DataTable)
 
         # only add rows to the table if the values are valid
         if message.pressure >= 0 and message.pressure >= 0:
@@ -358,8 +372,10 @@ class PreviousCalculationDisplay(VerticalGroup):
         self, message: CalculateLinearRegressionAction
     ) -> None:
         try:
-            table = self.query_one(DataTable)
-            self.query_one(Label).update("Calibration factors")
+            table = self.query_one(f"#{self.reader.get_pt_id()}-data-table", DataTable)
+            self.query_one(
+                f"#{self.reader.get_pt_id()}-data-table-label", Label
+            ).update(f"Calibration factors for {self.reader.get_pt_name()} PTs")
         except NoMatches:
             return
 

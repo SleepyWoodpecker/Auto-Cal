@@ -31,7 +31,7 @@ def validate_port(answers, current) -> bool:
 # )
 
 
-PORT_HV = "/dev/tty.debug-console"
+PORT_HV = "/dev/tty.usbserial-2110"
 PORT_LV = "/dev/tty.usbserial-0001"
 
 

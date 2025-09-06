@@ -1,6 +1,6 @@
 from serial import Serial
 import numpy as np
-import threading
+import threading, time
 from cal import cal
 
 
@@ -27,18 +27,17 @@ class SerialReader:
     def read_from_serial(self) -> None:
         """take a reading from serial, and place it into the readings dict"""
         # clear the current readings first
-        with self.serial_lock:
-            self.serial.reset_input_buffer()
+        self.serial.reset_input_buffer()
 
-            line = None
-            try:
-                line = self.serial.readline().decode().strip()
-            except UnicodeDecodeError:
-                print("Error decoding current sequence, continuing...")
-                return
+        line = None
+        try:
+            line = self.serial.readline().decode().strip()
+        except UnicodeDecodeError:
+            print("Error decoding current sequence, continuing...")
+            return
 
-            if not line:
-                return
+        if not line:
+            return
 
         # based on the current format, the data is coming in the format:
         # pt1, pt2, pt3...
@@ -67,11 +66,13 @@ class SerialReader:
     def ready_for_avg(self) -> bool:
         """crudely check for"""
         if len(self.readings) <= 0:
-            return False
+            raise Exception("No readings recorded for avg calculation")
 
         for reding_set in self.readings.values():
             if len(reding_set) != self.num_readings_per_pt:
-                return False
+                raise Exception(
+                    f"Expected {self.num_readings_per_pt} readings, but only got {len(reding_set)} readings. Reading set: {self.readings}"
+                )
 
         return True
 

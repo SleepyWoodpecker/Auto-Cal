@@ -26,8 +26,6 @@ def main() -> None:
         print("No PTs to calibrate. Exiting.")
         sys.exit(1)
 
-    print(answers)
-
     app = cli.AutoCalCli(
         baud_rate=int(answers["baud_rate"]),
         num_readings_per_pressure=int(answers["num_readings_per_pt"]),
