@@ -27,33 +27,39 @@ class SerialReader:
     def __del__(self):
         self.serial.close()
 
-    def read_from_serial(self, is_first_reading: bool) -> None:
+    def read_from_serial(self, is_first_reading) -> None:
         """take a reading from serial, and place it into the readings dict"""
         # clear the current readings first
         with self.serial_lock:
-
             # for the first reading of the set, clear the buffer and the first potentially incomplete line
             if is_first_reading:
                 self.serial.reset_input_buffer()
-                # skip the first reading
-                self.serial.read_until(b"\n")
 
-            line = None
+            readings = None
             try:
-                line = self.serial.read_until(b"\n").decode().strip()
+                # try to take 10 differnt set of readings to get one set of accurate readings
+                for i in range(10):
+                    line = self.serial.read_until(b"\n").decode().strip()
+                    line_readings = line.split(", ")
+                    if len(line_readings) == self.num_sensors:
+                        readings = line_readings
+                        break
+
+                    # increasing wait time if the readings are still not coming in properly
+                    time.sleep(0.3 * (i + 1))
+
+                if not readings:
+                    raise Exception(
+                        f"None of the 10 readings gave the desired set of values. Aborting..."
+                    )
+
             except UnicodeDecodeError:
                 print("Error decoding current sequence, continuing...")
                 return
 
-            if not line:
-                return
-
-        # based on the current format, the data is coming in the format:
-        # pt1, pt2, pt3...
-        readings = line.split(", ")
-        if len(readings) != self.num_sensors:
+        if not readings:
             raise ValueError(
-                f"Expected {self.num_sensors} readings, but received {len(readings)} | readings: {readings}"
+                f"Expected {self.num_sensors} readings, but received {len(readings) if readings else readings} | readings: {readings}"
             )
 
         # add the reading to the dict

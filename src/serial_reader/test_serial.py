@@ -1,6 +1,6 @@
 import serial
 
-ser = serial.Serial(port="/dev/tty.usbserial-2110", baudrate=115200, timeout=2)
+ser = serial.Serial(port="/dev/tty.usbserial-0001", baudrate=115200, timeout=2)
 cnt = 0
 print(ser.in_waiting, " bytes waiting to be read")
 
