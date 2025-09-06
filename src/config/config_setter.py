@@ -23,32 +23,87 @@ def validate_port(answers, current) -> bool:
         )
 
 
+PORT_HV = (
+    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_B4:3A:45:B3:70:B0-if00"
+)
+PORT_LV = (
+    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_B4:3A:45:B6:7E:D0-if00"
+)
+
+
 class Config:
     def __init__(self):
-        self.questions = [
+        self.HV = "High Voltage"
+        self.LV = "Low Voltage"
+
+        # split the questions into multiple stages so that we can ask questions conditionally
+        self.question_stage_one = [
             inquirer.Text(
                 "baud_rate",
                 message="Controller baud rate",
                 validate=validate_number,
                 default=115200,
             ),
-            inquirer.List(
-                "serial_port",
-                message="Serial port to read from",
-                choices=[p.device for p in list_ports.comports()],
-            ),
-            inquirer.Text(
-                "num_pts",
-                message="Number of pts to calibrate",
-                validate=validate_number,
-            ),
-            inquirer.Text(
-                "num_readings_per_pt",
-                message="Number of readings to take per pt",
-                validate=validate_number,
-                default=10,
+            inquirer.Checkbox(
+                "ports_to_read",
+                message="Select the sets of PTs you wish to calibrate. (Click space to select, ENTER to confirm)",
+                choices=[self.HV, self.LV],
             ),
         ]
 
     def prompt(self):
-        return inquirer.prompt(self.questions, raise_keyboard_interrupt=True)
+        answers = inquirer.prompt(
+            self.question_stage_one, raise_keyboard_interrupt=True
+        )
+
+        if not answers or not (pts_to_read := answers.get("ports_to_read", None)):
+            return answers
+
+        # clean up the answers dict
+        del answers["ports_to_read"]
+
+        pt_configs = []
+        if self.HV in pts_to_read:
+            hv_pt_count = inquirer.prompt(
+                [
+                    inquirer.Text(
+                        "hv_pts",
+                        message="Number of PTs on HV",
+                        validate=validate_number,
+                    )
+                ]
+            )
+            if hv_pt_count:
+                pt_configs.append({"port": PORT_HV, "pt_count": hv_pt_count["hv_pts"]})
+
+        if self.LV in pts_to_read:
+            lv_pt_count = inquirer.prompt(
+                [
+                    inquirer.Text(
+                        "lv_pts",
+                        message="Number of PTs on LV",
+                        validate=validate_number,
+                    )
+                ]
+            )
+            if lv_pt_count:
+                pt_configs.append({"port": PORT_LV, "pt_count": lv_pt_count["hv_pts"]})
+
+        answers["pt_configs"] = pt_configs
+
+        # ask the remaining question
+        num_readings_per_pt = inquirer.prompt(
+            [
+                inquirer.Text(
+                    "num_readings_per_pt",
+                    message="Number of readings to take per pt",
+                    validate=validate_number,
+                    default=10,
+                ),
+            ]
+        )
+
+        if num_readings_per_pt:
+            answers.update(num_readings_per_pt)
+
+        return answers

@@ -12,19 +12,26 @@ def main() -> None:
     try:
         answers = config.prompt()
     except KeyboardInterrupt:
-        print("Set-up cancelled exiting...")
+        print("Set-up cancelled, exiting...")
         sys.exit(1)
 
     if not answers:
+        print("No answers provided for set up. Exiting.")
         sys.exit(1)
 
-    app = cli.AutoCalCli(
-        baud_rate=int(answers["baud_rate"]),
-        serial_port="/dev/tty.usbserial-0001",
-        num_readings_per_pressure=int(answers["num_readings_per_pt"]),
-        num_pts=int(answers["num_pts"]),
-    )
-    app.run()
+    if not answers.get("pt_configs", None):
+        print("No PTs to calibrate. Exiting.")
+        sys.exit(1)
+
+    print(answers)
+
+    # app = cli.AutoCalCli(
+    #     baud_rate=int(answers["baud_rate"]),
+    #     serial_port="/dev/tty.usbserial-0001",
+    #     num_readings_per_pressure=int(answers["num_readings_per_pt"]),
+    #     num_pts=int(answers["num_pts"]),
+    # )
+    # app.run()
 
 
 if __name__ == "__main__":
