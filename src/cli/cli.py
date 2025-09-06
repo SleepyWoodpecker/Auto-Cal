@@ -245,8 +245,8 @@ class CurrentCalibrationProgressIndicator(Widget):
         if worker.is_cancelled:
             raise Exception("Worker errored out, aborting calibration...")
 
-        for _ in range(self.num_readings_per_pressure):
-            reader.read_from_serial()
+        for i in range(self.num_readings_per_pressure):
+            reader.read_from_serial(is_first_reading=(i == 0))
             try:
                 self.query_one(f"#{reader.get_pt_id()}-progress", ProgressBar).advance(
                     1

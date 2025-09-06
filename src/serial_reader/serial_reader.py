@@ -15,9 +15,6 @@ class SerialReader:
         timeout: int = 2,
     ):
         self.serial = Serial(serial_port, baudrate=baud_rate, timeout=timeout)
-        self.serial.reset_input_buffer()
-        self.serial.reset_output_buffer()
-
         self.readings = {i: [] for i in range(num_sensors)}
         self.num_sensors = num_sensors
         self.num_readings_per_pt = num_readings_per_pt
@@ -30,14 +27,16 @@ class SerialReader:
     def __del__(self):
         self.serial.close()
 
-    def read_from_serial(self) -> None:
+    def read_from_serial(self, is_first_reading: bool) -> None:
         """take a reading from serial, and place it into the readings dict"""
         # clear the current readings first
         with self.serial_lock:
-            self.serial.reset_input_buffer()
 
-            # skip the first reading
-            self.serial.read_until(b"\n")
+            # for the first reading of the set, clear the buffer and the first potentially incomplete line
+            if is_first_reading:
+                self.serial.reset_input_buffer()
+                # skip the first reading
+                self.serial.read_until(b"\n")
 
             line = None
             try:
