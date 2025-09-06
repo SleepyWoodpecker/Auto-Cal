@@ -15,6 +15,9 @@ class SerialReader:
         timeout: int = 2,
     ):
         self.serial = Serial(serial_port, baudrate=baud_rate, timeout=timeout)
+        self.serial.reset_input_buffer()
+        self.serial.reset_output_buffer()
+
         self.readings = {i: [] for i in range(num_sensors)}
         self.num_sensors = num_sensors
         self.num_readings_per_pt = num_readings_per_pt
@@ -24,20 +27,27 @@ class SerialReader:
         # id is different from name because ID must not have spaces
         self.id = "-".join(name.split(" "))
 
+    def __del__(self):
+        self.serial.close()
+
     def read_from_serial(self) -> None:
         """take a reading from serial, and place it into the readings dict"""
         # clear the current readings first
-        self.serial.reset_input_buffer()
+        with self.serial_lock:
+            self.serial.reset_input_buffer()
 
-        line = None
-        try:
-            line = self.serial.readline().decode().strip()
-        except UnicodeDecodeError:
-            print("Error decoding current sequence, continuing...")
-            return
+            # skip the first reading
+            self.serial.read_until(b"\n")
 
-        if not line:
-            return
+            line = None
+            try:
+                line = self.serial.read_until(b"\n").decode().strip()
+            except UnicodeDecodeError:
+                print("Error decoding current sequence, continuing...")
+                return
+
+            if not line:
+                return
 
         # based on the current format, the data is coming in the format:
         # pt1, pt2, pt3...
