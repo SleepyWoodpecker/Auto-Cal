@@ -45,12 +45,6 @@ Middle {
   grid-size: 2 1;
 }
 
-#previous-display {
-  border: solid orange;
-  layout: grid;
-  grid-size: 2 1;
-}
-
 #current-pressure-label {
   dock: top;
 }

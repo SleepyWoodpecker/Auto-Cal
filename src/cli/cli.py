@@ -104,6 +104,15 @@ class TableRowUpdated(Message):
 class FullCalibrationDisplay(HorizontalGroup):
     """The main container for displaying the current readings and the previously calculated readings"""
 
+    # dynamically generate the CSS so that the tables can have ample space
+    CSS = """
+        #previous-display {
+            border: solid orange;
+            layout: grid;
+            grid-size: 2 1;
+        }
+    """
+
     def __init__(
         self,
         pts: list[serial_reader.SerialReader],
@@ -113,6 +122,7 @@ class FullCalibrationDisplay(HorizontalGroup):
     ):
         self.num_readings_per_pressure = num_readings_per_pressure
         self.pts = pts
+        self.total_num_pts = sum([i.get_num_pts() for i in pts])
         self.hv = hv
         self.lv = lv
         super().__init__()
@@ -125,7 +135,6 @@ class FullCalibrationDisplay(HorizontalGroup):
             )
             with Container(id="previous-display"):
                 for reader in self.pts:
-                    print("displaying one")
                     yield PreviousCalculationDisplay(reader, self.hv, self.lv)
 
     def on_average_raw_reading_updated(self, message: AverageRawReadingUpdated) -> None:
@@ -134,6 +143,24 @@ class FullCalibrationDisplay(HorizontalGroup):
             prev_display.post_message(
                 TableRowUpdated(message.pressure, message.raw_readings, message.pt_id)
             )
+
+    def on_mount(self) -> None:
+        prev_display_container = self.query_one("#previous-display", Container)
+        prev_display_container.styles.border = ("solid", "orange")
+
+        prev_display_container.styles.grid_size_columns = 2
+        prev_display_container.styles.grid_size_rows = 1
+
+        # allocate space on the number of pts that each port has
+
+        container_split = ""
+        for pt in self.pts:
+            container_split += f" {int( (pt.get_num_pts() + 1) / (self.total_num_pts + len(self.pts) ) * 100)}%"
+
+        print("the style is ", container_split.strip())
+        prev_display_container.styles.grid_columns = container_split.strip()
+
+        prev_display_container.styles.layout = "grid"
 
 
 class PressureUpdated(Message):
