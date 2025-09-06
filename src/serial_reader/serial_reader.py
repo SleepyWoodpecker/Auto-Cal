@@ -11,6 +11,7 @@ class SerialReader:
         baud_rate: int,
         num_sensors: int,
         num_readings_per_pt: int,
+        name: str,
         timeout: int = 2,
     ):
         self.serial = Serial(serial_port, baudrate=baud_rate, timeout=timeout)
@@ -19,6 +20,9 @@ class SerialReader:
         self.num_readings_per_pt = num_readings_per_pt
         self.serial_lock = threading.Lock()
         self.all_avgs = {i: [] for i in range(num_sensors)}
+        self.name = name
+        # id is different from name because ID must not have spaces
+        self.id = "-".join(name.split(" "))
 
     def read_from_serial(self) -> None:
         """take a reading from serial, and place it into the readings dict"""
@@ -86,3 +90,12 @@ class SerialReader:
             )
 
         return linear_regressions
+
+    def get_pt_name(self) -> str:
+        return self.name
+
+    def get_num_pts(self) -> int:
+        return self.num_sensors
+
+    def get_pt_id(self) -> str:
+        return self.id

@@ -1,18 +1,14 @@
-from textual import on
+from textual import on, work
 from textual.app import App, ComposeResult
 from textual.widgets import Footer, Header, Input, Label, ProgressBar, DataTable
-from textual.containers import (
-    HorizontalGroup,
-    VerticalGroup,
-    Container,
-    Middle,
-)
+from textual.containers import HorizontalGroup, VerticalGroup, Container, Middle, Center
 from textual.validation import Number
 from textual.reactive import reactive
 from textual.css.query import NoMatches
 from textual.message import Message
 from textual.widget import Widget
 from textual.timer import Timer
+from textual.worker import get_current_worker
 
 from serial_reader import serial_reader
 
@@ -41,16 +37,29 @@ class AutoCalCli(App):
         self,
         baud_rate: int,
         num_readings_per_pressure: int,
-        serial_port: str,
-        num_pts: int,
+        pt_configs: list[dict[str, str | int]],
+        hv: str,
+        lv: str,
     ):
-        self.num_readings_per_pressure = num_readings_per_pressure
-        self.num_pts = num_pts
+        # dynamically load the PTs that you have to read from
+        self.pts = []
+        for config in pt_configs:
+            assert isinstance(port := config.get("port", None), str)
+            assert isinstance(pt_count := config.get("pt_count", None), int)
+            assert isinstance(name := config.get("name", None), str)
+            self.pts.append(
+                serial_reader.SerialReader(
+                    serial_port=port,
+                    baud_rate=baud_rate,
+                    num_sensors=pt_count,
+                    num_readings_per_pt=num_readings_per_pressure,
+                    name=name,
+                )
+            )
 
-        # initialize a serial reader class
-        self.serial_reader = serial_reader.SerialReader(
-            serial_port, baud_rate, num_pts, num_readings_per_pressure
-        )
+        self.num_readings_per_pt = num_readings_per_pressure
+        self.hv = hv
+        self.lv = lv
         super().__init__()
 
     def compose(self) -> ComposeResult:
@@ -58,7 +67,7 @@ class AutoCalCli(App):
         yield Header()
         yield Footer()
         yield FullCalibrationDisplay(
-            self.num_readings_per_pressure, self.num_pts, self.serial_reader
+            self.pts, self.num_readings_per_pt, self.hv, self.lv
         )
 
     def _post_calibration_message(self) -> None:
@@ -95,22 +104,27 @@ class FullCalibrationDisplay(HorizontalGroup):
 
     def __init__(
         self,
+        pts: list[serial_reader.SerialReader],
         num_readings_per_pressure: int,
-        num_pts: int,
-        serial_reader: serial_reader.SerialReader,
+        hv: str,
+        lv: str,
     ):
         self.num_readings_per_pressure = num_readings_per_pressure
-        self.num_pts = num_pts
-        self.serial_reader = serial_reader
+        self.pts = pts
+        self.hv = hv
+        self.lv = lv
         super().__init__()
 
     # current set of readings + current set of commands
     def compose(self) -> ComposeResult:
         with Container(id="main-app-container"):
             yield CurrentCalibrationDisplay(
-                self.num_readings_per_pressure, self.serial_reader
+                self.num_readings_per_pressure, self.pts, self.hv, self.lv
             )
-            yield PreviousCalculationDisplay(self.num_pts, self.serial_reader)
+            with Container(id="previous-display"):
+                for reader in self.pts:
+                    print("displaying one")
+                    yield PreviousCalculationDisplay(reader, self.hv, self.lv)
 
     def on_average_raw_reading_updated(self, message: AverageRawReadingUpdated) -> None:
         self.query_one(PreviousCalculationDisplay).post_message(
@@ -130,17 +144,23 @@ class CurrentCalibrationDisplay(VerticalGroup):
     current_pressure: reactive[float] = reactive(-1)
 
     def __init__(
-        self, num_readings_per_pressure: int, serial_reader: serial_reader.SerialReader
+        self,
+        num_readings_per_pressure: int,
+        pts: list[serial_reader.SerialReader],
+        hv: str,
+        lv: str,
     ):
         self.num_readings_per_pressure = num_readings_per_pressure
-        self.serial_reader = serial_reader
+        self.pts = pts
+        self.hv = hv
+        self.lv = lv
         super().__init__()
 
     def compose(self) -> ComposeResult:
         with Container(id="current-calibration-container"):
             yield CurrentCalibrationUserInputWidget().data_bind()
             yield CurrentCalibrationProgressIndicator(
-                self.num_readings_per_pressure, self.serial_reader
+                self.num_readings_per_pressure, self.pts, self.hv, self.lv
             ).data_bind(CurrentCalibrationDisplay.current_pressure)
 
     def on_pressure_updated(self, message: PressureUpdated) -> None:
@@ -149,7 +169,8 @@ class CurrentCalibrationDisplay(VerticalGroup):
 
         # reset the progress bar as well
         try:
-            self.query_one(ProgressBar).update(progress=0)
+            for progress_bar in self.query(ProgressBar):
+                progress_bar.update(progress=0)
         except NoMatches:
             pass
 
@@ -162,10 +183,16 @@ class CurrentCalibrationProgressIndicator(Widget):
     is_first_load = True
 
     def __init__(
-        self, num_readings_per_pressure: int, serial_reader: serial_reader.SerialReader
+        self,
+        num_readings_per_pressure: int,
+        pts: list[serial_reader.SerialReader],
+        hv: str,
+        lv: str,
     ):
         self.num_readings_per_pressure = num_readings_per_pressure
-        self.serial_reader = serial_reader
+        self.pts = pts
+        self.hv = hv
+        self.lv = lv
         super().__init__()
 
     def compose(self) -> ComposeResult:
@@ -174,12 +201,19 @@ class CurrentCalibrationProgressIndicator(Widget):
                 f"Reading pressure... {self.current_pressure}", id="pressure-display"
             )
             yield Label("", id="raw-reading")
-            with Middle():
-                yield ProgressBar(
-                    total=self.num_readings_per_pressure,
-                    show_eta=False,
-                    show_percentage=False,
-                )
+            # render a progress bar for each set of PTs
+            with Middle(id="progress-bar-container"):
+                for pt_set in self.pts:
+                    with Container():
+                        with Center():
+                            yield Label(f"{pt_set.get_pt_name()} pts")
+                        with Center():
+                            yield ProgressBar(
+                                total=self.num_readings_per_pressure,
+                                show_eta=False,
+                                show_percentage=False,
+                                id=f"{pt_set.get_pt_id()}-progress",
+                            )
 
     def watch_current_pressure(self, pressure: float) -> None:
         """Update the label when pressure changes"""
@@ -189,35 +223,38 @@ class CurrentCalibrationProgressIndicator(Widget):
             self.current_pressure = pressure
 
             if not self.is_first_load:
-                self.run_worker(
-                    self.take_readings_from_serial,
-                    exclusive=True,
-                    exit_on_error=True,
-                    thread=True,
-                )
+                for reader in self.pts:
+                    self.take_readings_from_serial(reader)
+
             else:
                 self.is_first_load = False
 
         except NoMatches:
             pass
 
-    # async method to handle the reading of data from serial
-    async def take_readings_from_serial(self) -> None:
-        for _ in range(self.num_readings_per_pressure):
-            self.serial_reader.read_from_serial()
+    @work(thread=True, exit_on_error=True)
+    async def take_readings_from_serial(
+        self, reader: serial_reader.SerialReader
+    ) -> None:
+        """reader to read simultaneously from each serial port"""
+        worker = get_current_worker()
+        if worker.is_cancelled:
+            raise Exception("Worker errored out, aborting calibration...")
 
-            # progress the bar after taking one reading
+        for _ in range(self.num_readings_per_pressure):
+            reader.read_from_serial()
             try:
-                self.query_one(ProgressBar).advance(1)
+                self.query_one(f"{reader.get_pt_name()} progress", ProgressBar).advance(
+                    1
+                )
             except NoMatches:
                 pass
 
-        # after completing the readings, calculate the average values
-        if self.serial_reader.ready_for_avg():
+        if reader.ready_for_avg():
             self.post_message(
                 AverageRawReadingUpdated(
                     self.current_pressure,
-                    self.serial_reader.calculate_avg(self.current_pressure),
+                    reader.calculate_avg(self.current_pressure),
                 )
             )
 
@@ -225,7 +262,6 @@ class CurrentCalibrationProgressIndicator(Widget):
 
     def watch_raw_reading(self, new_reading: float) -> None:
         """Update the screen when a raw reading comes in from serial"""
-        print(f"watch_raw_reading called with: {new_reading}")
         try:
             label = self.query_one("#raw-reading", Label)
             label.update(f"{f'Raw reading: {new_reading}' if new_reading >= 0 else ''}")
@@ -234,8 +270,9 @@ class CurrentCalibrationProgressIndicator(Widget):
             pass
 
     def on_mount(self) -> None:
-        """Set up timer"""
-        self.query_one(ProgressBar).update(progress=0)
+        """set the progress on all bars to 0"""
+        for progress_bar in self.query(ProgressBar):
+            progress_bar.update(progress=0)
 
 
 class CurrentCalibrationUserInputWidget(VerticalGroup):
@@ -290,22 +327,23 @@ class CurrentCalibrationUserInputWidget(VerticalGroup):
 
 
 class PreviousCalculationDisplay(VerticalGroup):
-    def __init__(self, num_pts: int, serial_reader: serial_reader.SerialReader) -> None:
-        self.num_pts = num_pts
-        self.serial_reader = serial_reader
+    def __init__(self, reader: serial_reader.SerialReader, hv: str, lv: str) -> None:
+        self.reader = reader
+        self.hv = hv
+        self.lv = lv
         super().__init__()
 
     def compose(self) -> ComposeResult:
-        with Container(id="previous-display"):
-            yield Label("Previous readings")
-            yield DataTable()
+        with Container(id=f"{self.reader.get_pt_id()}-previous-display"):
+            yield Label(f"Previous readings for {self.reader.get_pt_name()} PTs")
+            yield DataTable(id=f"{self.reader.get_pt_id()}-data-table")
 
     def on_mount(self) -> None:
-        table = self.query_one(DataTable)
+        table = self.query_one(f"#{self.reader.get_pt_id()}-data-table", DataTable)
 
         # create an additional column for each PT there is
-        pt_columns = [f"PT {i + 1}" for i in range(self.num_pts)]
-        table.add_column("Pressure", key="Pressure")
+        pt_columns = [f"PT {i + 1}" for i in range(self.reader.get_num_pts())]
+        table.add_column("PSI", key="Pressure")
         for pt in pt_columns:
             table.add_column(pt, key=pt)
 
@@ -329,7 +367,7 @@ class PreviousCalculationDisplay(VerticalGroup):
 
         # remove the old columns
         table.remove_column("Pressure")
-        pt_columns = [f"PT {i + 1}" for i in range(self.num_pts)]
+        pt_columns = [f"PT {i + 1}" for i in range(self.reader.get_num_pts())]
         for pt in pt_columns:
             table.remove_column(pt)
 
@@ -337,7 +375,7 @@ class PreviousCalculationDisplay(VerticalGroup):
         table.add_column("Calibration Values", key="values")
         table.add_columns(*pt_columns)
 
-        lrs = self.serial_reader.get_all_linear_regressions()
+        lrs = self.reader.get_all_linear_regressions()
 
         # add the m values
         slopes = [val[0] for val in lrs.values()]

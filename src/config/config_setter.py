@@ -23,16 +23,20 @@ def validate_port(answers, current) -> bool:
         )
 
 
-PORT_HV = (
-    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_B4:3A:45:B3:70:B0-if00"
-)
-PORT_LV = (
-    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_B4:3A:45:B6:7E:D0-if00"
-)
+# PORT_HV = (
+#     "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_B4:3A:45:B3:70:B0-if00"
+# )
+# PORT_LV = (
+#     "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_B4:3A:45:B6:7E:D0-if00"
+# )
+
+
+PORT_HV = "/dev/tty.debug-console"
+PORT_LV = "/dev/tty.usbserial-0001"
 
 
 class Config:
-    def __init__(self):
+    def __init__(self, hv: str, lv: str):
         self.HV = "High Voltage"
         self.LV = "Low Voltage"
 
@@ -71,10 +75,17 @@ class Config:
                         message="Number of PTs on HV",
                         validate=validate_number,
                     )
-                ]
+                ],
+                raise_keyboard_interrupt=True,
             )
             if hv_pt_count:
-                pt_configs.append({"port": PORT_HV, "pt_count": hv_pt_count["hv_pts"]})
+                pt_configs.append(
+                    {
+                        "port": PORT_HV,
+                        "pt_count": int(hv_pt_count["hv_pts"]),
+                        "name": self.HV,
+                    }
+                )
 
         if self.LV in pts_to_read:
             lv_pt_count = inquirer.prompt(
@@ -84,10 +95,17 @@ class Config:
                         message="Number of PTs on LV",
                         validate=validate_number,
                     )
-                ]
+                ],
+                raise_keyboard_interrupt=True,
             )
             if lv_pt_count:
-                pt_configs.append({"port": PORT_LV, "pt_count": lv_pt_count["hv_pts"]})
+                pt_configs.append(
+                    {
+                        "port": PORT_LV,
+                        "pt_count": int(lv_pt_count["lv_pts"]),
+                        "name": self.LV,
+                    }
+                )
 
         answers["pt_configs"] = pt_configs
 
@@ -100,7 +118,8 @@ class Config:
                     validate=validate_number,
                     default=10,
                 ),
-            ]
+            ],
+            raise_keyboard_interrupt=True,
         )
 
         if num_readings_per_pt:

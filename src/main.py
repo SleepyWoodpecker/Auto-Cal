@@ -2,10 +2,13 @@ from cli import cli
 from config import config_setter
 import sys
 
+HV = "High Voltage"
+LV = "Low Voltage"
+
 
 def main() -> None:
     # first get the config params
-    config = config_setter.Config()
+    config = config_setter.Config(hv=HV, lv=LV)
 
     answers = None
 
@@ -25,13 +28,14 @@ def main() -> None:
 
     print(answers)
 
-    # app = cli.AutoCalCli(
-    #     baud_rate=int(answers["baud_rate"]),
-    #     serial_port="/dev/tty.usbserial-0001",
-    #     num_readings_per_pressure=int(answers["num_readings_per_pt"]),
-    #     num_pts=int(answers["num_pts"]),
-    # )
-    # app.run()
+    app = cli.AutoCalCli(
+        baud_rate=int(answers["baud_rate"]),
+        num_readings_per_pressure=int(answers["num_readings_per_pt"]),
+        pt_configs=answers["pt_configs"],
+        hv=HV,
+        lv=LV,
+    )
+    app.run()
 
 
 if __name__ == "__main__":

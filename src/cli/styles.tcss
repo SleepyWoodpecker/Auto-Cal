@@ -23,6 +23,7 @@ Middle {
 #main-app-container {
   layout: grid;
   grid-size: 1 2; 
+  grid-rows: 40% 60%;
 }
 
 #current-calibration-container {
@@ -39,8 +40,15 @@ Middle {
   align: center middle;
 }
 
+#progress-bar-container {
+  layout: grid;
+  grid-size: 2 1;
+}
+
 #previous-display {
   border: solid orange;
+  layout: grid;
+  grid-size: 2 1;
 }
 
 #current-pressure-label {
